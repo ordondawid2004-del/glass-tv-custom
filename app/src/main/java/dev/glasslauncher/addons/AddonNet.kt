@@ -127,6 +127,7 @@ object AddonArt {
 
     /** The bytes of a valid static picture at [url], or null. Cached on disk for a few hours. */
     suspend fun fetch(context: Context, url: String): ByteArray? = withContext(Dispatchers.IO) {
+        if (dev.glasslauncher.system.RuntimeSafety.isolated) return@withContext null
         if (AddonLinks.image(url) == null) return@withContext null
         val dir = File(context.cacheDir, "addon-art")
         val file = File(dir, MessageDigest.getInstance("SHA-256").digest(url.toByteArray()).joinToString("") { "%02x".format(it) })

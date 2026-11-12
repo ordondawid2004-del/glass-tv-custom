@@ -1,5 +1,7 @@
 package dev.glasslauncher.home
 
+import dev.glasslauncher.system.RuntimeSafety
+
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
@@ -631,9 +633,10 @@ fun HomeScreen(model: HomeModel, homePresses: Flow<HomeRequest>) {
     // stall. While parked it is "closed" (exiting, inactive): invisible, unfocusable, out of the semantics tree, and
     // nothing in it runs (ControlCenter gates its effects on being open).
     var ccParked by remember { mutableStateOf(false) }
-    LaunchedEffect(ready) { if (ready) { delay(CC_PARK_AFTER_MS); ccParked = true } }
+    LaunchedEffect(ready) { if (ready && !RuntimeSafety.isolated) { delay(CC_PARK_AFTER_MS); ccParked = true } }
 
     fun open(overlay: Overlay) {
+        if (RuntimeSafety.isolated) if (!developmentOverlayAllowed(overlay)) return
         scope.launch {
             // The app switcher draws Home's baked blur instead; capturing the screen was most of its open cost.
             // Control Center draws only the sharp capture: it opens on that, and the blurs land while it grows (P316).
@@ -703,6 +706,7 @@ fun HomeScreen(model: HomeModel, homePresses: Flow<HomeRequest>) {
      * the window stays for summoning CC over *another* app, where Home's window is not there to draw into.
      */
     fun openControlCenter() {
+        if (RuntimeSafety.isolated) { open(Overlay.Settings); return }
         // A window opened over Home earlier (from another app) has to go, or it sits on top of the in-window copy.
         dev.glasslauncher.system.RemoteKeysService.instance?.controlCenter?.hide()
         open(Overlay.ControlCenter)
@@ -934,6 +938,7 @@ fun HomeScreen(model: HomeModel, homePresses: Flow<HomeRequest>) {
         onDispose { lifecycle.removeObserver(observer) }
     }
     LaunchedEffect(cfg.aerialsIdleMinutes, cfg.screensaverMode, cfg.screensaverDuringMusic) {
+        if (RuntimeSafety.isolated) return@LaunchedEffect
         val limit = if (cfg.screensaverMode != dev.glasslauncher.data.ScreensaverMode.System) cfg.aerialsIdleMinutes * 60_000L else 0L
         if (limit <= 0) return@LaunchedEffect
         while (true) {
@@ -1051,6 +1056,7 @@ fun HomeScreen(model: HomeModel, homePresses: Flow<HomeRequest>) {
             listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 -> scope.launch {
                 runCatching { scrollToTop() }; focusKey(firstKey())
             }
+            else -> if (RuntimeSafety.isolated) (context as? android.app.Activity)?.finish()
         }
     }
     // P93: a plain-APK install can't turn Glass's accessibility service on itself: once, a card that opens Fire's
@@ -1058,7 +1064,7 @@ fun HomeScreen(model: HomeModel, homePresses: Flow<HomeRequest>) {
     // P95: the first-run "Make VITRE your Home" card (a plain APK isn't Home until the user does one of two things).
     val homeCard by dev.glasslauncher.system.KeysService.homeCard.collectAsStateWithLifecycle()
     LaunchedEffect(homeCard, overlays.isEmpty()) {
-        if (!homeCard || overlays.isNotEmpty()) return@LaunchedEffect
+        if (RuntimeSafety.isolated || !homeCard || overlays.isNotEmpty()) return@LaunchedEffect
         dev.glasslauncher.system.KeysService.homeCardShown()
         open(Overlay.Confirm(
             "Make VITRE your Home",
@@ -1073,7 +1079,7 @@ fun HomeScreen(model: HomeModel, homePresses: Flow<HomeRequest>) {
     // P98: APK mode, the remote has been gone for 30 s with the screen on: one card that opens Fire's remote settings.
     val remoteCard by dev.glasslauncher.system.RemoteWatch.card.collectAsStateWithLifecycle()
     LaunchedEffect(remoteCard, overlays.isEmpty()) {
-        if (!remoteCard || overlays.isNotEmpty()) return@LaunchedEffect
+        if (RuntimeSafety.isolated || !remoteCard || overlays.isNotEmpty()) return@LaunchedEffect
         dev.glasslauncher.system.RemoteWatch.cardShown()
         open(Overlay.Confirm(
             "Remote not connected",
@@ -1083,7 +1089,7 @@ fun HomeScreen(model: HomeModel, homePresses: Flow<HomeRequest>) {
     }
     val keysCard by dev.glasslauncher.system.KeysService.card.collectAsStateWithLifecycle()
     LaunchedEffect(keysCard, overlays.isEmpty()) {
-        if (!keysCard || overlays.isNotEmpty()) return@LaunchedEffect
+        if (RuntimeSafety.isolated || !keysCard || overlays.isNotEmpty()) return@LaunchedEffect
         dev.glasslauncher.system.KeysService.cardShown()
         open(Overlay.Confirm(
             "Turn on remote buttons?",
@@ -1376,7 +1382,7 @@ fun HomeScreen(model: HomeModel, homePresses: Flow<HomeRequest>) {
                 onSearch = { open(Overlay.Search) },
                 // P93 #7: the time is the one piece of chrome worth leaving over the wallpaper when Home fades out.
                 keepClockWhenIdle = true,
-                onNotices = { open(Overlay.Notices) },
+                onNotices = if (RuntimeSafety.isolated) null else ({ open(Overlay.Notices) }),
                 // Read the store's state here so a posted notification re-draws the dot (P98).
                 noticeCount = noticeTick.let { dev.glasslauncher.system.NoticeStore.count(cfg.blockedNoticePackages.toSet()) },
                 modifier = Modifier.align(Alignment.TopEnd).focusRequester(pillRequester).onFocusChanged { pillFocused = it.hasFocus; ControlCenterWindow.pillFocused = it.hasFocus },
@@ -1390,7 +1396,7 @@ fun HomeScreen(model: HomeModel, homePresses: Flow<HomeRequest>) {
             LaunchedEffect(exiting.none { it is Overlay.ControlCenter }) { if (exiting.none { it is Overlay.ControlCenter }) CcEditEntry.returning = false }
             // Control Center opened from Settings (Edit Layout): composed once, hidden, while Settings' page for it is up,
             // so the open's cold-composition cost isn't between Select and the grid growing (P101).
-            if (CcEditEntry.warmWanted && !CcEditEntry.warmed && overlays.lastOrNull() == Overlay.Settings) {
+            if (!RuntimeSafety.isolated && CcEditEntry.warmWanted && !CcEditEntry.warmed && overlays.lastOrNull() == Overlay.Settings) {
                 Box(Modifier.size(1.dp).graphicsLayer { alpha = 0f }) {
                     ControlCenter({}, cfg, active = false, open = {}, closeAll = {})
                 }

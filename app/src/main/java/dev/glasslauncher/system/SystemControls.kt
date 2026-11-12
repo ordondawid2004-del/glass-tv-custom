@@ -39,6 +39,7 @@ object SystemControls {
     fun bluetoothOn(): Boolean? = runCatching { android.bluetooth.BluetoothAdapter.getDefaultAdapter()?.isEnabled }.getOrNull()
 
     fun open(context: Context, action: String): Boolean = runCatching {
+        if (RuntimeSafety.isolated) return false
         context.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         true
     }.getOrDefault(false)
@@ -73,6 +74,7 @@ object SystemControls {
      * won't boot with a privileged permission missing from it.)
      */
     fun openTvSettings(context: Context, section: TvSettingsSection): Boolean {
+        if (RuntimeSafety.isolated) return false
         val component = "$FIRE_SETTINGS/.${section.fireActivity}"
         val opened = runCatching {
             context.startActivity(
@@ -98,6 +100,7 @@ object SystemControls {
      * root has to be the first attempt rather than a fallback.
      */
     fun openQuickMenu(context: Context) {
+        if (RuntimeSafety.isolated) return
         val app = context.applicationContext
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             val ok = Root.available() && Root.run("am start -n $QUICK_MENU/.StartQSUIActivity -f 0x10000000").ok
@@ -120,6 +123,7 @@ object SystemControls {
 
     // Control Center's Alexa page: Amazon's own screens (resolved on Fire OS 8, Fire TV Stick 4K).
     fun openSmartHome(context: Context): Boolean = runCatching {
+        if (RuntimeSafety.isolated) return false
         context.startActivity(Intent().setClassName("com.amazon.smarthomemapviewapp", "com.amazon.smarthomemapviewapp.SmartHomeActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }.isSuccess || runCatching {
         context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("com.amazon.smarthomemapviewapp://smarthomedashboard")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -131,6 +135,7 @@ object SystemControls {
      * activity and it closed at once (no voice session). Alexa listens through the remote's microphone.
      */
     fun askAlexa(context: Context): Boolean {
+        if (RuntimeSafety.isolated) return false
         val app = context.applicationContext
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             kotlinx.coroutines.delay(350) // Control Center closes first
@@ -142,6 +147,7 @@ object SystemControls {
 
     /** Alexa's settings: guarded by an Amazon permission, so Glass opens it as root. */
     fun openAlexaSettings(context: Context): Boolean {
+        if (RuntimeSafety.isolated) return false
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             Root.run("am start -n com.amazon.vizzini/.setting.AlexaSettingActivity -a amazon.intent.action.ALEXA_SETTING")
         }

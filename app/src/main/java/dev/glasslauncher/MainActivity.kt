@@ -1,5 +1,7 @@
 package dev.glasslauncher
 
+import dev.glasslauncher.system.RuntimeSafety
+
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -64,6 +66,7 @@ class MainActivity : ComponentActivity() {
         (application as GlassApp).homeShown()
         stoppedSinceResume = false
         dev.glasslauncher.system.RemoteWatch.homeInFront = true
+        if (RuntimeSafety.isolated) return
         dev.glasslauncher.system.RemoteWatch.evaluate(this)
         dev.glasslauncher.downloads.Downloads.onForeground(this)
         // Coming back to Home while the banner is up (the screensaver was dismissed) is the user returning.
@@ -85,6 +88,7 @@ class MainActivity : ComponentActivity() {
 
     /** The Appstore's launcher entry asks Home for Amazon's apps page; show the store instead of ignoring it. */
     private fun storeRequest(intent: Intent?): Boolean {
+        if (RuntimeSafety.isolated) return false
         if (!dev.glasslauncher.system.AmazonStore.isStoreRequest(intent)) return false
         // Opening the store turns Amazon's launcher on (root), so only the Appstore itself may ask. The referrer is the
         // system's record of the caller unless the intent supplies its own, which any app could forge.
@@ -122,6 +126,7 @@ class MainActivity : ComponentActivity() {
 
     /** Remote buttons (RemoteKeysService) ask for Control Center or the app switcher this way. */
     private fun request(intent: Intent?) {
+        if (RuntimeSafety.isolated) return
         when (intent?.action) {
             ACTION_CONTROL_CENTER -> requests.trySend(HomeRequest.ControlCenter)
             ACTION_SETTINGS -> requests.trySend(HomeRequest.Settings)
@@ -133,12 +138,12 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val ACTION_CONTROL_CENTER = "dev.glasslauncher.action.CONTROL_CENTER"
-        const val ACTION_APP_SWITCHER = "dev.glasslauncher.action.APP_SWITCHER"
-        const val ACTION_TV_SETTINGS = "dev.glasslauncher.action.TV_SETTINGS"
-        const val ACTION_SETTINGS = "dev.glasslauncher.action.SETTINGS"
-        const val ACTION_REMOTES = "dev.glasslauncher.action.REMOTES"
-        const val ACTION_DOWNLOADS = "dev.glasslauncher.action.DOWNLOADS"
+        const val ACTION_CONTROL_CENTER = "${BuildConfig.APPLICATION_ID}.action.CONTROL_CENTER"
+        const val ACTION_APP_SWITCHER = "${BuildConfig.APPLICATION_ID}.action.APP_SWITCHER"
+        const val ACTION_TV_SETTINGS = "${BuildConfig.APPLICATION_ID}.action.TV_SETTINGS"
+        const val ACTION_SETTINGS = "${BuildConfig.APPLICATION_ID}.action.SETTINGS"
+        const val ACTION_REMOTES = "${BuildConfig.APPLICATION_ID}.action.REMOTES"
+        const val ACTION_DOWNLOADS = "${BuildConfig.APPLICATION_ID}.action.DOWNLOADS"
 
         @Volatile private var current: java.lang.ref.WeakReference<MainActivity>? = null
 

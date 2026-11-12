@@ -159,6 +159,7 @@ object NowPlayingSource {
         context.packageName in NotificationManagerCompat.getEnabledListenerPackages(context)
 
     fun flow(context: Context): Flow<NowPlaying?> {
+        if (dev.glasslauncher.system.RuntimeSafety.isolated) return flowOf(null)
         if (!isAllowed(context)) { android.util.Log.w("GlassNowPlaying", "notification access not granted"); return flowOf(null) }
         val manager = context.getSystemService(MediaSessionManager::class.java) ?: return flowOf(null)
         return callbackFlow {

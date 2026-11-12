@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <!-- Build-type debug has higher priority than a flavor: remove its legacy debug entry points here. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_ROUTING" tools:node="remove" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.CAPTURE_AUDIO_OUTPUT" tools:node="remove" tools:ignore="ProtectedPermissions" />
+    <application>
+        <activity android:name="dev.glasslauncher.debug.DebugEventActivity" tools:node="remove" />
+        <receiver android:name="dev.glasslauncher.debug.CaptureProbeReceiver" tools:node="remove" />
+        <receiver android:name="dev.glasslauncher.debug.FakeSessionReceiver" tools:node="remove" />
+        <provider android:name="dev.glasslauncher.debug.FakeArtProvider" tools:node="remove" />
+    </application>
+</manifest>

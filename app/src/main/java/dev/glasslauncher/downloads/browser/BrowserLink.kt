@@ -1,5 +1,7 @@
 package dev.glasslauncher.downloads.browser
 
+import dev.glasslauncher.system.RuntimeSafety
+
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -48,6 +50,7 @@ object BrowserLink {
 
     /** Whether the browser is installed and Glass holds the permission, as the AirPlay row checks PhairPlay. */
     fun available(context: Context): Boolean {
+        if (RuntimeSafety.isolated) return false
         val pm = context.packageManager
         return runCatching { pm.getActivityInfo(component, 0) }.isSuccess &&
             pm.checkPermission(Link.PERMISSION, context.packageName) == PackageManager.PERMISSION_GRANTED
@@ -55,6 +58,7 @@ object BrowserLink {
 
     /** Starts (or brings forward) the browser; [url] is opened when it is https, else the browser starts on its address bar. */
     fun open(context: Context, url: String = "") {
+        if (RuntimeSafety.isolated) return
         app = context.applicationContext
         val intent = Intent().setComponent(component).putExtra(Link.EXTRA_LINK, messenger).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (Link.httpsHost(url) != null) intent.putExtra(Link.EXTRA_URL, url)
@@ -63,6 +67,7 @@ object BrowserLink {
 
     /** Glass is in front again after a keyboard or a card: show the page the user left, with no new URL. */
     private fun backToBrowser(c: Context) {
+        if (RuntimeSafety.isolated) return
         runCatching { c.startActivity(Intent().setComponent(component).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
@@ -77,6 +82,7 @@ object BrowserLink {
     }
 
     private fun handle(m: Message) {
+        if (RuntimeSafety.isolated) return
         val c = app ?: return
         if (!trusted(c, m)) return
         val msg = runCatching { Msg.decode(m.what) { m.data?.getString(it) } }.getOrNull() ?: return
@@ -89,6 +95,7 @@ object BrowserLink {
     }
 
     private fun reply(to: Messenger?, msg: Msg) {
+        if (RuntimeSafety.isolated) return
         val m = Message.obtain(null, msg.what)
         m.data = Bundle().also { b -> msg.fields().forEach { (k, v) -> b.putString(k, v) } }
         runCatching { to?.send(m) }

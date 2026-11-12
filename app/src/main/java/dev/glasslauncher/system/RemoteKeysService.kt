@@ -21,6 +21,7 @@ class RemoteKeysService : AccessibilityService() {
     val controlCenter by lazy { dev.glasslauncher.home.ControlCenterWindow(this) }
 
     override fun onServiceConnected() {
+        if (RuntimeSafety.isolated) return
         instance = this
         // A bound keys service is a second way to have the always-on remote scan armed (P100): a Home that was force-
         // stopped cancels the scan's PendingIntent, and nothing delivers to a stopped app until it starts again.
@@ -56,6 +57,7 @@ class RemoteKeysService : AccessibilityService() {
     fun showBannerNow(text: String, forMs: Long) = notices.showNow(text, forMs)
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
+        if (RuntimeSafety.isolated) return false
         // A key from anything but the remote (CEC, a phone app, a controller) says the user is at the TV: the
         // fresh-batteries hint is allowed for a while after it (P98), never on a plain idle Home.
         if (event.action == KeyEvent.ACTION_DOWN) RemoteWatch.noteKey(event.device?.name)
@@ -325,6 +327,7 @@ class RemoteKeysService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        if (RuntimeSafety.isolated) return
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
         if (resumeWindowAt == null && resumeRequest?.pkg == pkg) resumeWindowAt = android.os.SystemClock.uptimeMillis()

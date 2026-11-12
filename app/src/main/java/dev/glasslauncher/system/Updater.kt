@@ -25,6 +25,7 @@ object Updater {
     private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun latest(http: OkHttpClient): Release? = withContext(Dispatchers.IO) {
+        if (RuntimeSafety.isolated) return@withContext null
         val request = Request.Builder()
             .url("https://api.github.com/repos/${BuildConfig.UPDATE_REPO}/releases/latest")
             .header("Accept", "application/vnd.github+json")
@@ -58,13 +59,14 @@ object Updater {
     /** No digest published may proceed; a published one must match. */
     internal fun digestOk(want: String?, actual: String) = want == null || want == actual
 
-    fun canInstall(context: Context) = context.packageManager.canRequestPackageInstalls()
+    fun canInstall(context: Context) = !RuntimeSafety.isolated && context.packageManager.canRequestPackageInstalls()
 
     fun unknownSourcesIntent(context: Context) =
         Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     suspend fun downloadAndInstall(context: Context, http: OkHttpClient, release: Release, progress: (Float) -> Unit) {
+        if (RuntimeSafety.isolated) throw IllegalStateException(RuntimeSafety.reason)
         val file = StagedApk.newFile(context)
         withContext(Dispatchers.IO) {
             http.newCall(Request.Builder().url(release.apkUrl).build()).execute().use { r ->
@@ -98,6 +100,7 @@ object Updater {
 
 class InstallResultReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (RuntimeSafety.isolated) return
         if (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, -1) == PackageInstaller.STATUS_PENDING_USER_ACTION) {
             @Suppress("DEPRECATION")
             val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return

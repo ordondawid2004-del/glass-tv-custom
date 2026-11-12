@@ -1,5 +1,7 @@
 package dev.glasslauncher.data
 
+import dev.glasslauncher.system.RuntimeSafety
+
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -62,6 +64,7 @@ class ConfigStore(
     fun export(): String = json.encodeToString(LauncherConfig.serializer(), config.value)
 
     suspend fun import(text: String) {
+        if (RuntimeSafety.isolated) throw IllegalStateException(RuntimeSafety.reason)
         val parsed = json.decodeFromString(LauncherConfig.serializer(), text)
         update { parsed }
     }

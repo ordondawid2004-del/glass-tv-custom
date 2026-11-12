@@ -1,5 +1,7 @@
 package dev.glasslauncher.apps
 
+import dev.glasslauncher.system.RuntimeSafety
+
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -45,7 +47,7 @@ class AppRepository(private val context: Context) {
         // CATEGORY_LAUNCHER activity (`.grid.AppsGridLauncherActivity`) asks Home for Amazon's app grid and, with that
         // launcher disabled, lands on the *stock Fire OS home* instead of the store. Its ADE home opens the store
         // directly, so it is used in place of the launcher entry.
-        LAUNCH_OVERRIDES[app.packageName]?.let { cls ->
+        LAUNCH_OVERRIDES[app.packageName]?.takeUnless { RuntimeSafety.isolated }?.let { cls ->
             val explicit = Intent(Intent.ACTION_MAIN).setComponent(ComponentName(app.packageName, cls))
             if (pm.resolveActivity(explicit, 0) != null) return explicit.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }

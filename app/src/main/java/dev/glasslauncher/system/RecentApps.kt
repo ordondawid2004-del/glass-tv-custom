@@ -65,6 +65,7 @@ object RecentApps {
      * REMOVE_TASKS permission, which the glass-system module can grant), so a closed app really leaves the stack.
      */
     fun removeTasks(context: Context, pkg: String) {
+        if (RuntimeSafety.isolated) return
         val am = context.getSystemService(ActivityManager::class.java) ?: return
         tasks(context).filter { it.packageName == pkg }.forEach { t ->
             runCatching { ActivityManager::class.java.getMethod("removeTask", Int::class.javaPrimitiveType).invoke(am, t.taskId) }
@@ -78,6 +79,7 @@ object RecentApps {
      * launches normally, which is the APK-mode behaviour this never regresses.
      */
     fun resume(context: Context, pkg: String, options: android.os.Bundle? = null): Boolean = runCatching {
+        if (RuntimeSafety.isolated) return false
         val task = tasks(context).firstOrNull { it.packageName == pkg } ?: return@runCatching false
         val am = context.getSystemService(ActivityManager::class.java) ?: return@runCatching false
         @Suppress("DEPRECATION")
@@ -139,6 +141,7 @@ object RecentApps {
      * something worked.
      */
     suspend fun stop(context: Context, pkg: String): Boolean {
+        if (RuntimeSafety.isolated) return false
         runCatching { context.getSystemService(ActivityManager::class.java)?.killBackgroundProcesses(pkg) }
         removeTasks(context, pkg)
         val privileged = runCatching {

@@ -1,5 +1,7 @@
 package dev.glasslauncher.home
 
+import dev.glasslauncher.system.RuntimeSafety
+
 import android.app.Application
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -137,6 +139,7 @@ class HomeModel(application: Application) : AndroidViewModel(application) {
     )
 
     private fun startSafely(intent: Intent) {
+        if (RuntimeSafety.isolated) return
         try { getApplication<Application>().startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { }
     }
 

@@ -88,6 +88,7 @@ class BtPairing(context: Context) {
 
     @SuppressLint("MissingPermission")
     fun start(): Boolean {
+        if (RuntimeSafety.isolated) return false
         val a = adapter ?: return false
         if (!a.isEnabled || permissionsMissing()) return false
         if (!registered) {
@@ -110,6 +111,7 @@ class BtPairing(context: Context) {
 
     @SuppressLint("MissingPermission")
     fun pair(address: String): Boolean {
+        if (RuntimeSafety.isolated) return false
         val d = runCatching { adapter?.getRemoteDevice(address) }.getOrNull() ?: return false
         runCatching { adapter?.cancelDiscovery() }
         return runCatching { d.createBond() }.getOrDefault(false)

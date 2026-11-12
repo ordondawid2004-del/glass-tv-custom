@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 /** Carries out [KeysServicePolicy]'s decision (P93). Called on every Home resume; "at boot" is a changed system boot counter, not a new process. */
 object KeysService {
     private const val PREFS = "keysService"
-    private const val SERVICE = "dev.glasslauncher/dev.glasslauncher.system.RemoteKeysService"
+    private const val SERVICE = "${dev.glasslauncher.BuildConfig.APPLICATION_ID}/dev.glasslauncher.system.RemoteKeysService"
 
     private val _card = MutableStateFlow(false)
     /** True when Home should show its one "turn on remote buttons" card (consumed with [cardShown]). */
@@ -26,6 +26,7 @@ object KeysService {
 
     /** The setting changed (Settings): turning it on again re-arms the enable attempt and the card. */
     fun onSettingChanged(context: Context, on: Boolean) {
+        if (RuntimeSafety.isolated) return
         val p = context.getSharedPreferences(PREFS, 0).edit()
         if (on) p.remove("lastOnUpdate").putBoolean("cardShown", false)
         p.apply()
@@ -39,6 +40,7 @@ object KeysService {
     }
 
     suspend fun check(context: Context) {
+        if (RuntimeSafety.isolated) return
         val app = context.applicationContext
         val prefs = app.getSharedPreferences(PREFS, 0)
         // A boot, not a process restart (LMK and crashes restart Glass too): the system's boot counter changed.
@@ -115,6 +117,7 @@ object KeysService {
     }
 
     private suspend fun enable(context: Context, mode: WriteMode) {
+        if (RuntimeSafety.isolated) return
         val current = Settings.Secure.getString(context.contentResolver, "enabled_accessibility_services")
         val wanted = RootFeatures.withService(current, SERVICE)
         when (mode) {

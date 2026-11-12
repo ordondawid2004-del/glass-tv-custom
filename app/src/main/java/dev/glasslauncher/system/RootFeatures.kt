@@ -76,6 +76,7 @@ object RootFeatures {
      * system from booting, so the allowlist lists every permission Glass requests.
      */
     suspend fun installSystemApp(context: Context): Root.Result {
+        if (RuntimeSafety.isolated) return Root.Result(126, RuntimeSafety.reason)
         val pm = context.packageManager
         val requested = runCatching {
             pm.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions?.toList()
@@ -129,6 +130,7 @@ object RootFeatures {
     fun ownRemotePairing(context: Context): Boolean = context.getSharedPreferences(PREFS, 0).getBoolean("ownRemotePairing", false)
 
     suspend fun setOwnRemotePairing(context: Context, on: Boolean): Root.Result {
+        if (RuntimeSafety.isolated) return Root.Result(126, RuntimeSafety.reason)
         val r = Root.action(
             context, "Own remote pairing ${if (on) "on" else "off"} (Fire's auto-pair ${if (on) "off" else "back"} after a restart)",
             "setprop persist.sys.auto_pair_sys_service ${if (on) "false" else "true"} || resetprop -p persist.sys.auto_pair_sys_service ${if (on) "false" else "true"}",
@@ -168,11 +170,12 @@ object RootFeatures {
      * open and Home Takeover hasn't been turned off.
      */
     suspend fun keepHome(context: Context) {
+        if (RuntimeSafety.isolated) return
         if (!context.getSharedPreferences(PREFS, 0).getBoolean("takeover", true)) return
         if (AmazonStore.isOpen(context) || stockHome(context).none { isEnabled(context, it) }) return
         if (!Root.available()) return
         Root.action(context, "The stock launcher was on: VITRE back as Home", stockHome(context).joinToString("\n") { "pm disable-user --user 0 $it" } +
-            "\ncmd package set-home-activity ${context.packageName}/.MainActivity")
+            "\ncmd package set-home-activity ${context.packageName}/dev.glasslauncher.MainActivity")
     }
 
     // ── The remote-keys accessibility service must always be on (P87) ────────────────────────────
@@ -186,7 +189,7 @@ object RootFeatures {
 
     suspend fun setHomeTakeover(context: Context, on: Boolean): Root.Result = (if (on) {
         Root.action(context, "Home takeover on", stockHome(context).joinToString("\n") { "pm disable-user --user 0 $it" } +
-            "\ncmd package set-home-activity ${context.packageName}/.MainActivity")
+            "\ncmd package set-home-activity ${context.packageName}/dev.glasslauncher.MainActivity")
     } else {
         Root.action(context, "Home takeover off (stock launcher back)", stockHome(context).joinToString("\n") { "pm enable $it" } +
             (stockHome(context).firstOrNull()?.let { "\n" + restoreHome(it) } ?: ""))
@@ -210,6 +213,7 @@ object RootFeatures {
 
     /** At start: the Fire OS Home-key flash off, and anything the old Fast profile left behind undone (once). */
     suspend fun reapplyAtStart(context: Context) {
+        if (RuntimeSafety.isolated) return
         if (!Root.available()) return
         // Fire OS turns its Home-key black flash (SystemUI KeyFeedbackUI) back on at every boot; it ran
         // over Glass's app-close animation. Found by e2e/test_device_setup.py after a restart.
@@ -266,6 +270,7 @@ object RootFeatures {
      * otherwise perceptible keeps running. Returns the memory freed, in MB.
      */
     suspend fun freeMemory(context: Context): Int {
+        if (RuntimeSafety.isolated) return 0
         val before = availableMb()
         if (Root.known || Root.available()) Root.action(context, "Free memory", "am kill-all")
         else killBackground(context)
@@ -287,6 +292,7 @@ object RootFeatures {
 
     /** Restart: root `svc power reboot`; a system app PowerManager.reboot (REBOOT); else false (the caller opens Fire's settings). */
     suspend fun reboot(context: Context): Boolean {
+        if (RuntimeSafety.isolated) return false
         if (Root.known || Root.available()) {
             // Logged first: the reboot ends Glass before Root.action could record it, so a restart Glass asked for
             // left no trace (P149: two unexplained "reboot,shell" restarts).
@@ -304,6 +310,7 @@ object RootFeatures {
     data class CleanUp(val cachesMb: Int, val memoryMb: Int, val bulkCaches: Boolean)
 
     suspend fun cleanUp(context: Context): CleanUp {
+        if (RuntimeSafety.isolated) throw IllegalStateException(RuntimeSafety.reason)
         val memory = freeMemory(context)
         val stat = android.os.StatFs(android.os.Environment.getDataDirectory().path)
         val before = stat.availableBytes

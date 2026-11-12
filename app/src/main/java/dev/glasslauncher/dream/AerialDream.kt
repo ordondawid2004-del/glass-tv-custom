@@ -1,5 +1,7 @@
 package dev.glasslauncher.dream
 
+import dev.glasslauncher.system.RuntimeSafety
+
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
@@ -171,6 +173,7 @@ object Screensaver {
 
     /** Turns always-on on or off. Returns whether the setting now reads as asked. */
     suspend fun setAlwaysOn(context: Context, on: Boolean): Boolean {
+        if (RuntimeSafety.isolated) return false
         val prefs = context.getSharedPreferences(PREFS, 0)
         val saved = if (prefs.contains(SAVED)) prefs.getLong(SAVED, 0L) else null
         val value: Long
@@ -198,6 +201,7 @@ object Screensaver {
 
     /** Needs WRITE_SECURE_SETTINGS (granted once over adb). Returns false if not permitted. */
     fun setAsSystemScreensaver(context: Context): Boolean = runCatching {
+        if (RuntimeSafety.isolated) return false
         val cr = context.contentResolver
         Settings.Secure.putString(cr, "screensaver_components", component(context).flattenToString())
         Settings.Secure.putInt(cr, "screensaver_enabled", 1)

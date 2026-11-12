@@ -1,5 +1,7 @@
 package dev.glasslauncher.addons
 
+import dev.glasslauncher.system.RuntimeSafety
+
 import android.content.ComponentName
 import android.content.ContentProviderClient
 import android.content.Context
@@ -66,6 +68,7 @@ internal object AddonClient {
 
     /** The add-on's reply string, or null on timeout, bind failure or error. */
     suspend fun call(context: Context, info: AddonInfo, code: Int, request: String): String? = withContext(Dispatchers.IO) {
+        if (RuntimeSafety.isolated) return@withContext null
         val connected = CompletableDeferred<IBinder>()
         val conn = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName, service: IBinder) { connected.complete(service) }
@@ -87,6 +90,7 @@ internal object AddonClient {
 
     /** One ContentProvider.call to the add-on's provider (Top Shelf, Home row, Settings). Same budget as a bind: 2 s, one call in flight per add-on. */
     suspend fun provider(context: Context, info: AddonInfo, method: String, request: String): String? = withContext(Dispatchers.IO) {
+        if (RuntimeSafety.isolated) return@withContext null
         val authority = info.authority ?: return@withContext null
         core.run(info.pkg, connect = {
             // The authority must still belong to the add-on's own package, checked right before the acquire.

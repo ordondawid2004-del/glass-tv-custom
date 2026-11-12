@@ -70,8 +70,10 @@ object ApkInstall {
      * Suspends until the install ends; in APK mode that includes the user's answer on the system card. Installs
      * exactly the staged copy, and refuses if it no longer matches the hash the card was shown for.
      */
-    suspend fun install(context: Context, staged: StagedApk): InstallResult =
-        install(edges(context), staged).also { if (it !is InstallResult.NeedsUserAction) staged.discard() }
+    suspend fun install(context: Context, staged: StagedApk): InstallResult {
+        if (RuntimeSafety.isolated) return InstallResult.Failed(RuntimeSafety.reason)
+        return install(edges(context), staged).also { if (it !is InstallResult.NeedsUserAction) staged.discard() }
+    }
 
     internal data class Installed(val versionCode: Long, val updatedAt: Long)
 
@@ -85,6 +87,7 @@ object ApkInstall {
     }
 
     internal suspend fun install(e: Edges, staged: StagedApk, attempts: Int = 5, pollMs: Long = 1_000): InstallResult {
+        if (RuntimeSafety.isolated) return InstallResult.Failed(RuntimeSafety.reason)
         // Hashing a whole APK is disk work; the caller may be on Main.
         suspend fun intact() = withContext(Dispatchers.IO) { runCatching { e.hash(staged.file) == staged.sha256 }.getOrDefault(false) }
         val changed = InstallResult.Failed("The file changed after it was checked")
@@ -150,6 +153,7 @@ object ApkInstall {
 
     /** The PackageInstaller commit shared with [Updater] (which wants no card where the system allows it). */
     internal suspend fun commit(context: Context, file: File, userAction: Boolean, await: Boolean = true): InstallResult = withContext(Dispatchers.IO) {
+        if (RuntimeSafety.isolated) return@withContext InstallResult.Failed(RuntimeSafety.reason)
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
         if (Build.VERSION.SDK_INT >= 31) params.setRequireUserAction(

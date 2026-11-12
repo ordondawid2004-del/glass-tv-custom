@@ -40,6 +40,7 @@ class LoadedTile(val image: ImageBitmap)
 class TileArt(context: Context, private val iconPacks: IconPacks, private val disk: TileDiskCache? = TileDiskCache(File(context.cacheDir, "tiles-v$DISK_VERSION"))) {
 
     private val contextCacheDir: File = context.cacheDir
+    private val appContext = context.applicationContext
 
     private val res = context.resources
     private val pm: PackageManager = context.packageManager
@@ -196,6 +197,7 @@ class TileArt(context: Context, private val iconPacks: IconPacks, private val di
         if (app.updated == 0L) return null
         val custom = spec.customIcon?.let { path ->
             val f = File(path)
+            if (dev.glasslauncher.system.RuntimeSafety.isolated && !dev.glasslauncher.system.RuntimeSafety.privateFile(appContext, f)) return null
             if (!f.exists()) return null
             "$path:${f.length()}:${f.lastModified()}"
         }
@@ -290,6 +292,7 @@ class TileArt(context: Context, private val iconPacks: IconPacks, private val di
 
     private fun decodeFile(path: String): Bitmap? {
         val file = File(path)
+        if (dev.glasslauncher.system.RuntimeSafety.isolated && !dev.glasslauncher.system.RuntimeSafety.privateFile(appContext, file)) return null
         if (!file.exists()) return null
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(path, bounds)

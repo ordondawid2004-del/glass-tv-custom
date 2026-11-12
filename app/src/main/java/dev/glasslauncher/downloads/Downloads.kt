@@ -1,5 +1,7 @@
 package dev.glasslauncher.downloads
 
+import dev.glasslauncher.system.RuntimeSafety
+
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -18,7 +20,7 @@ object Downloads {
 
     /** `Android/data/<pkg>/files/Downloads`: no permission needed, removed with Glass. */
     fun folder(context: Context): File =
-        context.getExternalFilesDir("Downloads") ?: File(context.filesDir, "Downloads").also { it.mkdirs() }
+        (if (RuntimeSafety.isolated) null else context.getExternalFilesDir("Downloads")) ?: File(context.filesDir, "Downloads").also { it.mkdirs() }
 
     /** Starts a download the way the manager does: the user's segment and concurrency settings, and the notification ask. */
     fun start(context: Context, d: dev.glasslauncher.data.DownloadsConfig, url: String, name: String?, sha256: String? = null, guardExec: Boolean = false, execOk: String = ""): String {
@@ -34,6 +36,7 @@ object Downloads {
 
     /** API 33+: the progress notification needs the permission; ask once before the first download. Downloads run either way. */
     fun askNotifications(context: Context) {
+        if (RuntimeSafety.isolated) return
         if (android.os.Build.VERSION.SDK_INT < 33) return
         if (context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED) return
         var c: Context? = context
@@ -43,17 +46,20 @@ object Downloads {
 
     /** Brings the service up for downloads still waiting after a process death or reboot. */
     fun resumePending(context: Context) {
+        if (RuntimeSafety.isolated) return
         if (queue(context).items.value.any { it.state == DownloadState.Queued }) startService(context)
     }
 
     /** Glass is visible, so a foreground start is allowed: bring back the service that was refused earlier. */
     fun onForeground(context: Context) {
+        if (RuntimeSafety.isolated) return
         if (!retryInForeground) return
         retryInForeground = false
         if (queue(context).items.value.any { it.state == DownloadState.Active || it.state == DownloadState.Queued }) startService(context)
     }
 
     internal fun startService(context: Context) {
+        if (RuntimeSafety.isolated) return
         try {
             context.startForegroundService(Intent(context, DownloadService::class.java))
         } catch (e: Exception) {
@@ -64,6 +70,7 @@ object Downloads {
     }
 
     private fun create(app: Context): DownloadQueue {
+        if (RuntimeSafety.isolated) throw IllegalStateException(RuntimeSafety.reason)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         return DownloadQueue(scope, DownloadEngine(), folder(app), File(app.filesDir, "downloads/queue.json")) { startService(app) }
             .also { it.load() }

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <!-- M1: ordinary app; no home, system services, companion permissions or shared storage. -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <!-- Lint's permission detector also visits removal markers; the APK allowlist verifies the actual result. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" tools:node="remove" />
+    <uses-permission android:name="android.permission.START_ANY_ACTIVITY" tools:node="remove" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="com.amazon.tv.permission.LAUNCHER_SETTINGS" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" tools:node="remove" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:node="remove" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_INSTALL_SESSIONS" tools:node="remove" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:node="remove" tools:ignore="QueryAllPackagesPermission" />
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.BLUETOOTH" tools:node="remove" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:node="remove" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" tools:node="remove" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" tools:node="remove" />
+    <uses-permission android:name="android.permission.BLUETOOTH_PRIVILEGED" tools:node="remove" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:node="remove" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" tools:node="remove" />
+    <uses-permission android:name="android.permission.GET_TASKS" tools:node="remove" />
+    <uses-permission android:name="android.permission.REORDER_TASKS" tools:node="remove" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:node="remove" tools:ignore="ProtectedPermissions" />
+    <permission android:name="com.phairplay.permission.CONTROL" tools:node="remove" />
+    <uses-permission android:name="com.phairplay.permission.CONTROL" tools:node="remove" />
+    <permission android:name="dev.glasslauncher.permission.BIND_ADDON" tools:node="remove" />
+    <uses-permission android:name="dev.glasslauncher.permission.BIND_ADDON" tools:node="remove" />
+    <permission android:name="dev.glasslauncher.permission.BROWSER" tools:node="remove" />
+    <uses-permission android:name="dev.glasslauncher.permission.BROWSER" tools:node="remove" />
+    <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA" tools:node="remove" />
+    <uses-permission android:name="com.android.providers.tv.permission.ACCESS_ALL_EPG_DATA" tools:node="remove" />
+    <uses-permission android:name="com.android.providers.tv.permission.ACCESS_WATCHED_PROGRAMS" tools:node="remove" />
+    <uses-permission android:name="android.permission.REBOOT" tools:node="remove" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.CLEAR_APP_CACHE" tools:node="remove" />
+    <uses-permission android:name="android.permission.HDMI_CEC" tools:node="remove" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.INSTALL_PACKAGES" tools:node="remove" tools:ignore="ProtectedPermissions" />
+    <queries tools:node="replace">
+        <intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent>
+        <intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LEANBACK_LAUNCHER" /></intent>
+    </queries>
+    <application android:banner="@drawable/banner">
+        <activity android:name="androidx.compose.ui.tooling.PreviewActivity" tools:node="remove" />
+        <activity android:name="dev.glasslauncher.MainActivity" tools:node="replace"
+            android:exported="true" android:launchMode="singleTask" android:screenOrientation="landscape"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+            android:windowSoftInputMode="adjustNothing">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity android:name="dev.glasslauncher.dream.AerialActivity" tools:node="remove" />
+        <service android:name="dev.glasslauncher.dream.AerialDreamService" tools:node="remove" />
+        <service android:name="dev.glasslauncher.widgets.NowPlayingService" tools:node="remove" />
+        <service android:name="dev.glasslauncher.system.HomeGuardService" tools:node="remove" />
+        <service android:name="dev.glasslauncher.system.RemoteKeysService" tools:node="remove" />
+        <service android:name="dev.glasslauncher.sonos.CaptureService" tools:node="remove" />
+        <activity android:name="dev.glasslauncher.sonos.CaptureConsentActivity" tools:node="remove" />
+        <service android:name="dev.glasslauncher.downloads.DownloadService" tools:node="remove" />
+        <receiver android:name="dev.glasslauncher.system.SleepTimer$Receiver" tools:node="remove" />
+        <receiver android:name="dev.glasslauncher.system.RemoteScanReceiver" tools:node="remove" />
+        <receiver android:name="dev.glasslauncher.system.AclReceiver" tools:node="remove" />
+        <receiver android:name="dev.glasslauncher.system.InstallResultReceiver" tools:node="remove" />
+        <receiver android:name="dev.glasslauncher.system.DebugDumpReceiver" tools:node="remove" />
+        <provider android:name="androidx.core.content.FileProvider" tools:node="remove" />
+        <receiver android:name="androidx.profileinstaller.ProfileInstallReceiver" tools:node="remove" />
+        <activity android:name="androidx.activity.ComponentActivity" tools:node="remove" />
+    </application>
+</manifest>

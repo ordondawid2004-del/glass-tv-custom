@@ -1,0 +1,119 @@
+name: Development size reference capture (inactive)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Evidence operation; never approves a baseline or an APK
+        required: true
+        type: choice
+        options: [resolution-only, capture]
+      bootstrap:
+        description: Owner-reviewed bootstrap JSON; full commits and independent digests
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  capture:
+    # Deployment interlock. No Settings value can activate this workflow.
+    if: ${{ false && github.repository == 'ordondawid2004-del/glass-tv-custom' && github.ref == 'refs/heads/master' && github.actor_id == github.repository_owner_id && github.triggering_actor == github.repository_owner }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: true
+      max-parallel: 2
+      matrix:
+        measurement: [1, 2]
+    name: capture-${{ matrix.measurement }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BOOTSTRAP_JSON: ${{ inputs.bootstrap }}
+      CAPTURE_MODE: ${{ inputs.mode }}
+      TVHOME_SIZE_JOB_NAME: capture-${{ matrix.measurement }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: engine
+          ref: ${{ fromJSON(inputs.bootstrap).engine_commit }}
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: source-checkout
+          ref: ${{ fromJSON(inputs.bootstrap).source_commit }}
+          persist-credentials: false
+      - name: Check owner-dispatched engine bytes before execution
+        shell: python
+        run: |
+          import hashlib, json, os, pathlib, re, subprocess
+          def pairs(items):
+              result = {}
+              for k, v in items:
+                  if k in result: raise ValueError('Duplicate bootstrap field')
+                  result[k] = v
+              return result
+          raw = os.environ['BOOTSTRAP_JSON'].encode()
+          if len(raw) > 8192: raise ValueError('Oversized bootstrap')
+          b = json.loads(raw, object_pairs_hook=pairs)
+          for name, size in [('engine_commit', 40), ('source_commit', 40), ('engine_manifest_sha256', 64)]:
+              if not re.fullmatch('[0-9a-f]{'+str(size)+'}', b[name]): raise ValueError('Invalid bootstrap digest')
+          files = []
+          for entry in subprocess.check_output(['git', '-C', 'engine', 'ls-tree', '-rz', '--full-tree', 'HEAD']).split(b'\0'):
+              if not entry: continue
+              meta, rel = entry.split(b'\t', 1)
+              mode, kind, _ = meta.decode().split()
+              if kind != 'blob' or mode not in ('100644', '100755'): raise ValueError('Unsupported engine tree')
+              data = (pathlib.Path('engine') / rel.decode()).read_bytes()
+              files.append(dict(path=rel.decode(), mode=mode, bytes=len(data), sha256=hashlib.sha256(data).hexdigest()))
+          files.sort(key=lambda e: e['path'])
+          actual = hashlib.sha256((json.dumps(files, sort_keys=True, separators=(',', ':'), ensure_ascii=False) + '\n').encode()).hexdigest()
+          if actual != b['engine_manifest_sha256']: raise ValueError('Untrusted engine')
+      - name: Capture evidence only
+        id: evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${JAVA_HOME_21_X64:-}" ]; then export JAVA_HOME="$JAVA_HOME_21_X64"; fi
+          run_dir="$(mktemp -d "$RUNNER_TEMP/tvhome-reference.XXXXXXXX")"
+          export RUN_DIR="$run_dir"
+          python3 - <<'PY'
+          import os, pathlib
+          pathlib.Path(os.environ['RUN_DIR'], 'bootstrap.json').write_text(os.environ['BOOTSTRAP_JSON'])
+          PY
+          if [ "$CAPTURE_MODE" = resolution-only ]; then
+            # Only measurement 1 performs resolution; measurement 2 cannot build an APK in this mode.
+            if [ '${{ matrix.measurement }}' != 1 ]; then exit 0; fi
+            source_commit="$(python3 -c 'import json,os; print(json.loads(os.environ["BOOTSTRAP_JSON"])["source_commit"])')"
+            engine_digest="$(python3 -c 'import json,os; print(json.loads(os.environ["BOOTSTRAP_JSON"])["engine_manifest_sha256"])')"
+            set +e
+            python3 -B engine/scripts/ci-size-gate.py resolution-only --source source-checkout --source-commit "$source_commit" --engine-manifest-sha256 "$engine_digest" --output "$run_dir/draft"
+            result=$?
+            set -e
+            [ "$result" -eq 3 ]
+            python3 -c 'import json,os,pathlib; d=json.loads((pathlib.Path(os.environ["RUN_DIR"])/"draft/DRAFT-inputs.json").read_text()); assert d["status"]=="unreviewed" and d["baseline_approved"] is False'
+            echo "reports_dir=$run_dir/draft" >> "$GITHUB_OUTPUT"
+          else
+            python3 -B engine/scripts/ci-size-gate.py preflight --reference-capture --bootstrap "$run_dir/bootstrap.json" --source source-checkout --output "$run_dir/context.json"
+            python3 -B engine/scripts/ci-size-gate.py prepare --context "$run_dir/context.json" --source source-checkout --output "$run_dir/input.json"
+            set +e
+            python3 -B engine/scripts/ci-development.py reference-capture --project-root "$run_dir/source" --output "$run_dir/output" --temp-dir "$run_dir/private" --size-contract-context "$run_dir/context.json"
+            result=$?
+            set -e
+            [ "$result" -eq 3 ]
+            python3 -c 'import json,os,pathlib; p=pathlib.Path(os.environ["RUN_DIR"])/"output/reports"; s=json.loads((p/"summary.json").read_text()); assert s["status"]=="measurement_only"; assert (p/"measurement.json").is_file(); assert not (p.parent/"approved").exists()'
+            echo "reports_dir=$run_dir/output/reports" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload evidence whitelist only (never APK or cache directories)
+        if: ${{ success() && steps.evidence.outputs.reports_dir != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: size-reference-evidence-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.measurement }}
+          path: |
+            ${{ steps.evidence.outputs.reports_dir }}/*.json
+            ${{ steps.evidence.outputs.reports_dir }}/DRAFT-verification-metadata.xml
+            ${{ steps.evidence.outputs.reports_dir }}/resolution.log
+          if-no-files-found: error
+          retention-days: 14

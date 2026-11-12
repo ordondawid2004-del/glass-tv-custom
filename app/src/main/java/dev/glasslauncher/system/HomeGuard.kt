@@ -22,6 +22,7 @@ class HomeGuardService : AccessibilityService() {
     private var lastJump = 0L
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        if (RuntimeSafety.isolated) return
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         if (!app.config.config.value.homeGuard) return
         val pkg = event.packageName?.toString() ?: return
@@ -53,7 +54,7 @@ object HomeSetup {
 
     fun homeIntent(context: Context) = Intent(context, MainActivity::class.java)
         .setAction(Intent.ACTION_MAIN)
-        .addCategory(Intent.CATEGORY_HOME)
+        .addCategory(if (RuntimeSafety.isolated) Intent.CATEGORY_LAUNCHER else Intent.CATEGORY_HOME)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
 
     fun isDefaultHome(context: Context): Boolean {
@@ -66,6 +67,7 @@ object HomeSetup {
 
     /** Standard Android path: the Home role dialog, or the system home picker. Null if neither exists. */
     fun requestDefaultHomeIntent(context: Context): Intent? {
+        if (RuntimeSafety.isolated) return null
         if (Build.VERSION.SDK_INT >= 29) {
             val roles = context.getSystemService(RoleManager::class.java)
             if (roles != null && roles.isRoleAvailable(RoleManager.ROLE_HOME) && !roles.isRoleHeld(RoleManager.ROLE_HOME)) {
@@ -82,6 +84,7 @@ object HomeSetup {
      * found on a plain Android TV AVD), so the Make Glass the Default row did nothing.
      */
     fun startRequest(context: Context, intent: Intent) {
+        if (RuntimeSafety.isolated) return
         val activity = generateSequence(context) { (it as? android.content.ContextWrapper)?.baseContext }.filterIsInstance<android.app.Activity>().firstOrNull()
         if (needsResult(intent) && activity != null) activity.startActivityForResult(intent, REQUEST_HOME_ROLE)
         else context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -105,6 +108,7 @@ object HomeSetup {
 
     /** Turns the accessibility service on or off directly; needs WRITE_SECURE_SETTINGS. */
     fun setGuardEnabled(context: Context, enabled: Boolean): Boolean = runCatching {
+        if (RuntimeSafety.isolated) return false
         val cr = context.contentResolver
         val own = guardComponent(context).flattenToString()
         val current = Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)

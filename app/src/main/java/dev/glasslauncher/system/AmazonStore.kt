@@ -30,6 +30,7 @@ object AmazonStore {
         value?.takeIf { it.length in 1..64 && it.all { c -> c.isLetterOrDigit() || c == '_' || c == '.' || c == '-' } } ?: default
 
     suspend fun open(context: Context, node: String = "l_apps", source: String = "appstore"): Boolean {
+        if (RuntimeSafety.isolated) return false
         if (!Root.available()) return false
         val node = safeExtra(node, "l_apps")
         val source = safeExtra(source, "appstore")
@@ -52,6 +53,7 @@ object AmazonStore {
      * with the HOME category. Followed as root, from now on, while the store is open.
      */
     private fun watchForHome(context: Context) {
+        if (RuntimeSafety.isolated) return
         watcher?.destroy()
         // Every Home press logs wm_new_intent (pressed in Amazon's launcher) or wm_set_resumed_activity on
         // it (pressed in an app opened from the store). Epoch times keep out anything logged before.
@@ -60,7 +62,7 @@ object AmazonStore {
         // Root uses. logcat runs in the foreground of that shell, so the stream stays open until the watcher is
         // destroyed; closing stdin afterwards is harmless.
         val p = runCatching {
-            ProcessBuilder("su", "--mount-master").redirectErrorStream(true).start()
+            ProcessBoundary.start(listOf("su", "--mount-master"))
         }.getOrNull() ?: return
         watcher = p
         runCatching {
@@ -96,6 +98,7 @@ object AmazonStore {
 
     /** Puts Glass back as Home if a store visit left Amazon's launcher on. Cheap when nothing is pending. */
     suspend fun close(context: Context, bringHome: Boolean) {
+        if (RuntimeSafety.isolated) return
         val prefs = context.getSharedPreferences(PREFS, 0)
         if (!prefs.getBoolean("open", false)) return
         prefs.edit().putBoolean("open", false).apply()
@@ -103,8 +106,8 @@ object AmazonStore {
         Root.action(context, "Close Appstore", buildString {
             // The launcher is normally already off; disabling is idempotent and covers a store visit that turned it on.
             appendLine("pm disable-user --user 0 $STOCK")
-            appendLine("cmd package set-home-activity ${context.packageName}/.MainActivity")
-            if (bringHome) appendLine("am start -a android.intent.action.MAIN -c android.intent.category.HOME -n ${context.packageName}/.MainActivity")
+            appendLine("cmd package set-home-activity ${context.packageName}/dev.glasslauncher.MainActivity")
+            if (bringHome) appendLine("am start -a android.intent.action.MAIN -c android.intent.category.HOME -n ${context.packageName}/dev.glasslauncher.MainActivity")
         })
     }
 

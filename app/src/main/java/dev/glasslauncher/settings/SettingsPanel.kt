@@ -1,5 +1,7 @@
 package dev.glasslauncher.settings
 
+import dev.glasslauncher.system.RuntimeSafety
+
 import dev.glasslauncher.data.ScreensaverMode
 import dev.glasslauncher.system.SystemControls
 import androidx.compose.foundation.layout.Row
@@ -176,6 +178,10 @@ fun SettingsPanel(
     open: (Overlay) -> Unit,
     close: () -> Unit,
 ) {
+    if (RuntimeSafety.isolated) {
+        DevelopmentSettings(model, cfg, active)
+        return
+    }
     var stack by remember {
         // Control Center's Remotes and Game Controllers pages open Settings straight on their button mapping (P174).
         val entry = SettingsEntry.take()

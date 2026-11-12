@@ -14,6 +14,7 @@ object Backup {
     const val FILE_NAME = "glass-launcher-backup.json"
 
     suspend fun export(context: Context, text: String): String = withContext(Dispatchers.IO) {
+        if (RuntimeSafety.isolated) throw IllegalStateException(RuntimeSafety.reason)
         if (Build.VERSION.SDK_INT >= 29) {
             val resolver = context.contentResolver
             val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
@@ -33,6 +34,7 @@ object Backup {
     }
 
     suspend fun read(context: Context): String? = withContext(Dispatchers.IO) {
+        if (RuntimeSafety.isolated) return@withContext null
         if (Build.VERSION.SDK_INT >= 29) {
             findOwn(context)?.let { uri -> context.contentResolver.openInputStream(uri)?.use { String(it.readBytes()) } }
         } else {
@@ -42,6 +44,7 @@ object Backup {
     }
 
     suspend fun readUri(context: Context, uri: android.net.Uri): String? = withContext(Dispatchers.IO) {
+        if (RuntimeSafety.isolated) return@withContext null
         runCatching { context.contentResolver.openInputStream(uri)?.use { String(it.readBytes()) } }.getOrNull()
     }
 

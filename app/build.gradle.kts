@@ -25,9 +25,10 @@ android {
     }
 
     signingConfigs {
-        // CI supplies a real key through secrets. Local builds fall back to the debug key; release tags must not (see build.yml).
+        // No production key is generated locally. Release variants require complete external credentials.
         val keystore = System.getenv("RELEASE_KEYSTORE")?.let { file(it) }
-        if (keystore != null && keystore.exists()) {
+        if (keystore != null && keystore.isFile && listOf("RELEASE_KEYSTORE_PASSWORD", "RELEASE_KEY_ALIAS", "RELEASE_KEY_PASSWORD")
+                .all { !System.getenv(it).isNullOrBlank() }) {
             create("release") {
                 storeFile = keystore
                 storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
@@ -35,16 +36,45 @@ android {
                 keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
             }
         }
+        create("development") {
+            // Dedicated development key, provisioned outside Git. Never use M0 fixture keys.
+            val androidUserHome = System.getenv("ANDROID_USER_HOME") ?: "${System.getProperty("user.home")}/.android"
+            storeFile = file(providers.gradleProperty("tvhomeDevKeystore").getOrElse("$androidUserHome/tvhome-development.keystore"))
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
+    flavorDimensions += "identity"
+    productFlavors {
+        create("original") {
+            dimension = "identity"
+            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "ISOLATED_DEVELOPMENT", "false")
+        }
+        create("development") {
+            dimension = "identity"
+            applicationId = "io.github.ordondawid2004del.tvhome.dev"
+            versionNameSuffix = "-m1-dev"
+            signingConfig = signingConfigs.getByName("development")
+            buildConfigField("boolean", "ISOLATED_DEVELOPMENT", "true")
+            buildConfigField("String", "UPDATE_REPO", "\"\"")
+        }
     }
 
     buildTypes {
+        debug {
+            // Each identity chooses its own debug key. Release overrides both with the release configuration.
+            signingConfig = null
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             // Fire TV (32-bit userland) and every arm64 box: x86 builds are debug-only (the emulators).
             ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
@@ -144,6 +174,13 @@ abstract class BuildMinute : ValueSource<Int, ValueSourceParameters.None> {
 }
 
 androidComponents {
+    beforeVariants { variant ->
+        // Also covers generated benchmarkRelease variants: none may inherit a flavor's debug key.
+        if (variant.buildType?.endsWith("release", ignoreCase = true) == true &&
+            (variant.productFlavors.any { it.second == "development" } || android.signingConfigs.findByName("release") == null)) {
+            variant.enable = false
+        }
+    }
     onVariants { variant ->
         val minute = providers.of(BuildMinute::class.java) {}
         variant.outputs.forEach { it.versionCode.set(minute) }

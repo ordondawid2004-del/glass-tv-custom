@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import dev.glasslauncher.R
+import dev.glasslauncher.system.RuntimeSafety
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Dispatchers
@@ -30,11 +31,16 @@ class DownloadService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        if (RuntimeSafety.isolated) return
         getSystemService(NotificationManager::class.java)
             .createNotificationChannel(NotificationChannel(CHANNEL, getString(R.string.downloads_channel), NotificationManager.IMPORTANCE_LOW))
     }
 
+    // Lint checks all shared sources against the variant manifest. M1 removes this service and
+    // POST_NOTIFICATIONS and rejects entry below; original declares it and still checks the grant.
+    @android.annotation.SuppressLint("NotificationPermission")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (RuntimeSafety.isolated) return START_NOT_STICKY
         lastStartId = startId
         // Foreground first: loading the queue reads a file, and the system gives a few seconds to call startForeground.
         if (!enterForeground(notification(emptyList()))) {
@@ -49,7 +55,9 @@ class DownloadService : Service() {
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf(lastStartId) // not stopSelf(): a start that arrived meanwhile keeps the service
                 } else {
-                    getSystemService(NotificationManager::class.java).notify(ID, notification(items))
+                    if (Build.VERSION.SDK_INT < 33 || checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        getSystemService(NotificationManager::class.java).notify(ID, notification(items))
+                    }
                 }
             }
         }
@@ -58,6 +66,7 @@ class DownloadService : Service() {
 
     // Android 15 ends dataSync services after six hours; pause cleanly instead of being crashed.
     override fun onTimeout(startId: Int, fgsType: Int) {
+        if (RuntimeSafety.isolated) return
         Downloads.queue(this).pauseAll()
         stopSelf(startId)
     }

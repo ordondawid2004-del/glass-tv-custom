@@ -1,5 +1,7 @@
 package dev.glasslauncher.sonos
 
+import dev.glasslauncher.system.RuntimeSafety
+
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -32,6 +34,7 @@ object SonosRoutes {
 
     @Synchronized
     private fun runner(context: Context): RouteRunner {
+        if (RuntimeSafety.isolated) throw IllegalStateException(RuntimeSafety.reason)
         runner?.let { return it }
         val app = context.applicationContext
         val r = RouteRunner(

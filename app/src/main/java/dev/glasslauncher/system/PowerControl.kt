@@ -34,6 +34,7 @@ object PowerControl {
      * threw). Never throws.
      */
     fun sendCecStandby(context: Context): Boolean = runCatching {
+        if (RuntimeSafety.isolated) return false
         val client = playbackClient(context) ?: return@runCatching false
         client.javaClass.getMethod("sendStandby").invoke(client)
         true
@@ -44,6 +45,7 @@ object PowerControl {
      * when the TV couldn't be told, so the caller can say the TV stays on; the stick still sleeps.
      */
     suspend fun standby(context: Context, onNoCec: () -> Unit = {}) {
+        if (RuntimeSafety.isolated) return
         // A failed CEC call lingers longer so the "TV stays on" notice is seen before the screen goes dark.
         val sent = sendCecStandby(context)
         if (!sent) onNoCec()

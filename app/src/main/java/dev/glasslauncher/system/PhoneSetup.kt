@@ -55,6 +55,7 @@ class PhoneSetupServer(
 
     /** Starts listening; returns the URL for the QR code, or null when there's no LAN address. */
     suspend fun start(scope: CoroutineScope): String? = withContext(Dispatchers.IO) {
+        if (RuntimeSafety.isolated) return@withContext null
         val address = lanAddress() ?: return@withContext null
         val server = ServerSocket(0, 8, address)
         socket = server

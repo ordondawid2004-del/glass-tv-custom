@@ -28,6 +28,7 @@ object Root {
      * perfectly. The authoritative test is running `id` and reading `uid=0` - if that works, su exists.
      */
     suspend fun available(): Boolean {
+        if (RuntimeSafety.isolated) return false
         granted?.let { return it }
         val ok = withContext(Dispatchers.IO) { withTimeoutOrNull(4_000) { exec("id").out.contains("uid=0") } } == true
         granted = ok
@@ -38,7 +39,7 @@ object Root {
     suspend fun recheck(): Boolean { granted = null; return available() }
 
     /** Last known result of [available] without checking (false until checked). */
-    val known: Boolean get() = granted == true
+    val known: Boolean get() = !RuntimeSafety.isolated && granted == true
 
     /**
      * A file only root can read, as bytes (null if unreadable). Glass writes any copy itself, so the copy carries
@@ -71,7 +72,8 @@ object Root {
 
     /** Code 124 = timed out or interrupted (the process may have done its work); 127 = it never started. */
     internal fun runProcess(cmd: List<String>, input: File, timeoutMs: Long): Result {
-        val p = try { ProcessBuilder(cmd).redirectErrorStream(true).start() } catch (e: Exception) { return Result(127, e.message ?: "su failed") }
+        if (RuntimeSafety.isolated) return Result(126, RuntimeSafety.reason)
+        val p = try { ProcessBoundary.start(cmd) } catch (e: Exception) { return Result(127, e.message ?: "su failed") }
         // Both pipes run on their own threads so the timeout below can fire while the process is stuck on either.
         val out = StringBuilder()
         val reader = Thread { runCatching { p.inputStream.bufferedReader().forEachLine { synchronized(out) { out.appendLine(it) } } } }.apply { start() }
@@ -105,7 +107,7 @@ object Root {
         private var seq = 0
 
         private fun start(): Process? = runCatching {
-            val p = ProcessBuilder("su", "--mount-master").redirectErrorStream(true).start()
+            val p = ProcessBoundary.start(listOf("su", "--mount-master"))
             val q = java.util.concurrent.LinkedBlockingQueue<String>()
             queue = q
             writer = p.outputStream.bufferedWriter()
@@ -125,6 +127,7 @@ object Root {
         }
 
         fun run(script: String, timeoutMs: Long): Result {
+            if (RuntimeSafety.isolated) return Result(126, RuntimeSafety.reason)
             lock.lock()
             try {
                 if (proc?.isAlive != true) { stop(); proc = start() }

@@ -1,5 +1,7 @@
 package dev.glasslauncher.addons
 
+import dev.glasslauncher.system.RuntimeSafety
+
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,6 +13,7 @@ internal object AddonScanner {
     /** All add-on services, or those of [pkg] only (the re-check right before a bind). */
     @Suppress("DEPRECATION")
     fun scan(context: Context, pkg: String? = null): List<AddonInfo> {
+        if (RuntimeSafety.isolated) return emptyList()
         val pm = context.packageManager
         // Only trust the permission if Glass itself declares it: another app that got there first could have defined it.
         val owner = try { pm.getPermissionInfo(AddonApi.PERMISSION, 0).packageName } catch (_: PackageManager.NameNotFoundException) { null }

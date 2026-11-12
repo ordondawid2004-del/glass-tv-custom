@@ -70,6 +70,7 @@ class RemotePairer(private val context: Context) {
     }
 
     fun start() {
+        if (RuntimeSafety.isolated) return
         if (started) return
         if (adapter == null) { Log.i(TAG, "no bluetooth adapter"); return }
         started = true
@@ -349,13 +350,14 @@ class RemotePairer(private val context: Context) {
 
     /** Results the system delivered for the registered scan (the receiver calls this, on the main thread). */
     fun onResults(results: List<android.bluetooth.le.ScanResult>) {
+        if (RuntimeSafety.isolated) return
         handler.post {
             for (r in results) onAdvert(r)
         }
     }
 
     companion object {
-        const val ACTION_SCAN = "dev.glasslauncher.action.REMOTE_SCAN"
+        const val ACTION_SCAN = "${dev.glasslauncher.BuildConfig.APPLICATION_ID}.action.REMOTE_SCAN"
         @Volatile private var instance: RemotePairer? = null
 
         /** The one pairer; a scan result that wakes a cold process starts it, if Glass's own pairing is on. */

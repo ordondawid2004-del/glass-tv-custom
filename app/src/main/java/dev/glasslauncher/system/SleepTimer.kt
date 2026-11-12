@@ -19,8 +19,8 @@ import kotlinx.coroutines.launch
 object SleepTimer {
     private const val PREFS = "sleepTimer"
     private const val KEY_END = "endAt"
-    private const val ACTION = "dev.glasslauncher.action.SLEEP_TIMER"
-    private const val ACTION_WARN = "dev.glasslauncher.action.SLEEP_TIMER_WARN"
+    private const val ACTION = "${dev.glasslauncher.BuildConfig.APPLICATION_ID}.action.SLEEP_TIMER"
+    private const val ACTION_WARN = "${dev.glasslauncher.BuildConfig.APPLICATION_ID}.action.SLEEP_TIMER_WARN"
     /** The banner comes this long before sleep. */
     const val WARN_MS = 60_000L
 
@@ -82,6 +82,7 @@ object SleepTimer {
 
     /** Starts (or, with 0, cancels) the timer. */
     fun set(context: Context, minutes: Int, now: Long = System.currentTimeMillis()) {
+        if (RuntimeSafety.isolated) return
         val alarms = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val prefs = context.getSharedPreferences(PREFS, 0)
         if (minutes <= 0) {
@@ -110,6 +111,7 @@ object SleepTimer {
 
     /** Pause what plays, then sleep. */
     fun fire(context: Context, scope: CoroutineScope = CoroutineScope(Dispatchers.Default)) {
+        if (RuntimeSafety.isolated) return
         context.getSharedPreferences(PREFS, 0).edit().putLong(KEY_END, 0L).putBoolean("warned", false).apply()
         runCatching { context.app.nowPlaying.state.value?.takeIf { it.playing }?.playPause() }
         scope.launch {
@@ -120,6 +122,7 @@ object SleepTimer {
 
     /** Root: KEYCODE_SLEEP. Otherwise Glass's accessibility service, if the user turned it on. Shared with Power Off (I09). */
     suspend fun sleepNow(context: Context) {
+        if (RuntimeSafety.isolated) return
         if (Root.known || Root.available()) Root.action(context, "Sleep timer: sleep", "input keyevent KEYCODE_SLEEP")
         else RemoteKeysService.instance?.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
     }

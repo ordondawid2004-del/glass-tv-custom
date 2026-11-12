@@ -381,6 +381,7 @@ class WallpaperLoader(private val context: Context, private val http: OkHttpClie
 
     /** Copies a user-picked image into app storage and returns its path. */
     suspend fun importImage(uri: Uri, name: String): String? = withContext(Dispatchers.IO) {
+        if (dev.glasslauncher.system.RuntimeSafety.isolated) return@withContext null
         val target = File(dir, name)
         runCatching {
             context.contentResolver.openInputStream(uri)!!.use { input -> target.outputStream().use { input.copyTo(it) } }
@@ -389,6 +390,7 @@ class WallpaperLoader(private val context: Context, private val http: OkHttpClie
     }
 
     fun importFile(source: File, name: String): String? {
+        if (dev.glasslauncher.system.RuntimeSafety.isolated) return null
         val target = File(dir, name)
         return runCatching { source.copyTo(target, overwrite = true); if (isImage(target)) target.path else null }.getOrNull()
     }
@@ -405,6 +407,7 @@ class WallpaperLoader(private val context: Context, private val http: OkHttpClie
     }
 
     private fun decode(file: File): Bitmap? {
+        if (dev.glasslauncher.system.RuntimeSafety.isolated && !dev.glasslauncher.system.RuntimeSafety.privateFile(context, file)) return null
         if (!file.exists()) return null
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.path, bounds)

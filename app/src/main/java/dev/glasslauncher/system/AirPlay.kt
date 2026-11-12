@@ -44,6 +44,7 @@ object AirPlay {
 
     /** The installed PhairPlay that has the control receiver, or null. */
     fun receiver(context: Context): ComponentName? {
+        if (RuntimeSafety.isolated) return null
         val pm = context.packageManager
         return PACKAGES.firstNotNullOfOrNull { pkg ->
             ComponentName(pkg, RECEIVER).takeIf {
@@ -75,7 +76,7 @@ object AirPlay {
         state.supportsControl && send(context, AirPlayProtocol.encodeTransport(target, command))
 
     private fun send(context: Context, intent: Intent): Boolean =
-        runCatching { context.sendBroadcast(intent, AirPlayProtocol.PERMISSION) }.isSuccess
+        !RuntimeSafety.isolated && runCatching { context.sendBroadcast(intent, AirPlayProtocol.PERMISSION) }.isSuccess
 
     /** What a STATE event means for the UI's state; null for the other events. */
     fun stateOf(event: Event): State? = (event as? Event.State)?.let { State(it.running, it.sender, it.protocol, it.settings) }
@@ -87,6 +88,7 @@ object AirPlay {
      * installed PhairPlay ([receiver]).
      */
     fun register(context: Context, actions: List<String> = AirPlayProtocol.EVENT_ACTIONS, onEvent: (Event) -> Unit): () -> Unit {
+        if (RuntimeSafety.isolated) return {}
         val listener = AirPlayEventReceiver(onEvent)
         val filter = IntentFilter().also { f -> actions.forEach(f::addAction) }
         ContextCompat.registerReceiver(context, listener, filter, AirPlayProtocol.PERMISSION, null, ContextCompat.RECEIVER_EXPORTED)
@@ -146,8 +148,9 @@ private class ContextLink(private val app: Context) : AirPlayLink {
 
     // The package manager is asked once and again only after a PhairPlay package changes, not on every resume.
     override fun target(): ComponentName? = (found ?: Found(AirPlay.receiver(app)).also { found = it }).target
-    override fun send(intent: Intent) = runCatching { app.sendBroadcast(intent, AirPlayProtocol.PERMISSION) }.isSuccess
+    override fun send(intent: Intent) = !RuntimeSafety.isolated && runCatching { app.sendBroadcast(intent, AirPlayProtocol.PERMISSION) }.isSuccess
     override fun listen(onEvent: (Event) -> Unit, onPackages: () -> Unit) {
+        if (RuntimeSafety.isolated) return
         AirPlay.register(app, onEvent = onEvent)
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED); addAction(Intent.ACTION_PACKAGE_REMOVED)
@@ -185,6 +188,7 @@ class AirPlayHub(
 
     /** Process start: listen for good and ask for the state. Safe to call from any thread, any number of times. */
     fun start() {
+        if (RuntimeSafety.isolated) return
         if (!started.compareAndSet(false, true)) return
         background.execute {
             link.listen({ e -> main { publish(reducer.onEvent(e)) } }, { resume() })

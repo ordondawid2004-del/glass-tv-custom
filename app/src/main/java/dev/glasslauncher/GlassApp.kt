@@ -1,5 +1,7 @@
 package dev.glasslauncher
 
+import dev.glasslauncher.system.RuntimeSafety
+
 import android.app.Application
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
@@ -21,7 +23,7 @@ import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
-class GlassApp : Application(), SingletonImageLoader.Factory {
+open class GlassApp : Application(), SingletonImageLoader.Factory {
 
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -44,6 +46,7 @@ class GlassApp : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         dev.glasslauncher.glass.CcAdapt.variantFile = java.io.File(filesDir, "cc-glass")
         dev.glasslauncher.ui.NetworkEpoch.register(this)
+        if (RuntimeSafety.isolated) return
         // A previous run that crashed while Glass held the TV muted for Sonos left it muted: undo that.
         chore(Dispatchers.Default) { dev.glasslauncher.sonos.SonosRoutes.recoverMute(this) }
         // Listen for PhairPlay from the start, so a pairing code or Now Playing that arrives before any screen opens is not lost.

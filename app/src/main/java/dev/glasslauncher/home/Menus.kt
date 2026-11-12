@@ -1,5 +1,7 @@
 package dev.glasslauncher.home
 
+import dev.glasslauncher.system.RuntimeSafety
+
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -111,6 +113,7 @@ fun OverlayContent(
     startFolderMove: (String) -> Unit = {},
     stopFolderMove: () -> Unit = {},
 ) {
+    if (RuntimeSafety.isolated && !developmentOverlayAllowed(overlay)) return
     when (overlay) {
         is Overlay.AppMenu -> AnchoredMenu(active, overlay.anchor) { first -> AppMenuBody(overlay, model, first, open, closeAll, startMove, startFolderMove) }
         is Overlay.MoveTo -> AnchoredMenu(active, overlay.anchor) { first -> MoveToBody(overlay, model, layout, cfg, first, open, closeAll) }
@@ -243,8 +246,9 @@ private fun ColumnScope.AppMenuBody(
     }
     MenuRow("Move to…", { open(Overlay.MoveTo(app, overlay.inDock, overlay.folderId, overlay.anchor)) }, f(), chevron = true,
         leading = { MenuIcon(dev.glasslauncher.R.drawable.ic_drive_file_move) })
-    MenuRow("Change Icon", { open(Overlay.IconPicker(app)) }, leading = { MenuIcon(dev.glasslauncher.R.drawable.ic_image) })
+    if (!RuntimeSafety.isolated) MenuRow("Change Icon", { open(Overlay.IconPicker(app)) }, leading = { MenuIcon(dev.glasslauncher.R.drawable.ic_image) })
     MenuRow("Hide", { model.hide(app.packageName); closeAll() }, leading = { MenuIcon(dev.glasslauncher.R.drawable.ic_visibility_off) })
+    if (RuntimeSafety.isolated) return
     MenuRow("App Info", { closeAll(); model.appInfo(app) }, leading = { MenuIcon(dev.glasslauncher.R.drawable.ic_info) })
     // The destructive action sits apart from the rest, as in tvOS menus.
     // Equal room above and below (the list's 7 dp row gap plus 5 dp each side), so the line sits centred in a clear gap.
@@ -470,7 +474,7 @@ private fun TextInputBody(overlay: Overlay.TextInput, active: Boolean, close: ()
             }, modifier = Modifier.testTag("text-paste"))
         }
         Spacer(Modifier.height(8.dp))
-        if (!overlay.isPassword && overlay.offerPhone) MenuRow("Type on Your Phone", {
+        if (!RuntimeSafety.isolated && !overlay.isPassword && overlay.offerPhone) MenuRow("Type on Your Phone", {
             open(Overlay.PhoneSetup(overlay.title, listOf(PhoneField("value", overlay.title, text, overlay.hint))) { values ->
                 values["value"]?.takeIf { it.isNotBlank() }?.let { text = it; submit() }
             })
